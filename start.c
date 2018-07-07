@@ -36,7 +36,7 @@ void delay();
 void DisplayChar(char f);
 void Scanner();
 void SIGNAL();
-
+void DelayLong();
 char Vline[30];
 char cc,y,U,P;
  int k;
@@ -50,6 +50,8 @@ char cc,y,U,P;
 
              This table defines the standard ASCII characters in a 3x5 dot format.
 --------------------------------------------------------------------------------------------------*/
+const char whichBlock [8] = 
+    { 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01} ;
 const char FontLookup [][6] =
 {
     { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },  // sp
@@ -168,21 +170,39 @@ void main()
  PORTD=0xff;
  
  while(1){
-    int i = 0;         
+   /* int i = 0;         
     for( i =0; i<6; i++){
     
         PORTB = ~FontLookup[5][i]; 
         delay();     
     }
- }
-
+ } 
+ */ int i,j ;
+ int x = 0 ;    
+for( j = 0 ; j < 8 ; j++){
+    x= 0 ;
+   for(i = j ; i<5+j ; i++){  
+   
+    PORTB=whichBlock[i%8];
+    PORTD=~FontLookup[5][x];    
+    delay();    
+    x++; 
+    }
+    DelayLong();
+   }
 }
 
-
+ } 
+ 
+void DelayLong()
+{
+ int t;
+  for(t=0;t<10000;t++){}
+}
 void delay()
 {
  int k; 
- for(k=1;k<16000;k++)
+ for(k=1;k<160;k++)
  {
  }
 }
@@ -255,10 +275,4 @@ f=f-0x20;
  }
   Vline[y]=0x00;
   y=0;//y++;
-}
-
-void Delay()
-{
- int t;
-  for(t=0;t<4000;t++);
 }

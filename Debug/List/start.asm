@@ -1125,6 +1125,8 @@ __START_OF_CODE:
 	JMP  0x00
 	JMP  0x00
 
+_whichBlock:
+	.DB  0x80,0x40,0x20,0x10,0x8,0x4,0x2,0x1
 _FontLookup:
 	.DB  0x0,0x0,0x0,0x0,0x0,0x0,0x3,0x3
 	.DB  0xFF,0xFF,0x3,0x3,0xF8,0xFC,0x7,0x7
@@ -1332,7 +1334,7 @@ __GLOBAL_INI_END:
 ;void DisplayChar(char f);
 ;void Scanner();
 ;void SIGNAL();
-;
+;void DelayLong();
 ;char Vline[30];
 ;char cc,y,U,P;
 ; int k;
@@ -1348,6 +1350,8 @@ __GLOBAL_INI_END:
 ;
 ;             This table defines the standard ASCII characters in a 3x5 dot format.
 ;--------------------------------------------------------------------------------------------------*/
+;const char whichBlock [8] =
+;    { 0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01} ;
 ;const char FontLookup [][6] =
 ;{
 ;    { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },  // sp
@@ -1450,60 +1454,98 @@ __GLOBAL_INI_END:
 ;};
 ;
 ;void main()
-; 0000 009B {
+; 0000 009D {
 
 	.CSEG
 _main:
 ; .FSTART _main
-; 0000 009C  cc=0;
+; 0000 009E  cc=0;
 	CLR  R5
-; 0000 009D  y=0;
+; 0000 009F  y=0;
 	CLR  R4
-; 0000 009E  DDRD=0xFF;
+; 0000 00A0  DDRD=0xFF;
 	LDI  R30,LOW(255)
 	OUT  0x11,R30
-; 0000 009F  DDRB=0xFF;
+; 0000 00A1  DDRB=0xFF;
 	OUT  0x17,R30
-; 0000 00A0 
-; 0000 00A1  //Initialize scanner
-; 0000 00A2  TCNT0=0xF1;
+; 0000 00A2 
+; 0000 00A3  //Initialize scanner
+; 0000 00A4  TCNT0=0xF1;
 	LDI  R30,LOW(241)
 	OUT  0x32,R30
-; 0000 00A3  TCCR0=0x05;
+; 0000 00A5  TCCR0=0x05;
 	LDI  R30,LOW(5)
 	OUT  0x33,R30
-; 0000 00A4  TIMSK=0x01;
+; 0000 00A6  TIMSK=0x01;
 	LDI  R30,LOW(1)
 	OUT  0x39,R30
-; 0000 00A5  SREG=0x80;
+; 0000 00A7  SREG=0x80;
 	LDI  R30,LOW(128)
 	OUT  0x3F,R30
-; 0000 00A6 
-; 0000 00A7  PORTB=0x00;
+; 0000 00A8 
+; 0000 00A9  PORTB=0x00;
 	LDI  R30,LOW(0)
 	OUT  0x18,R30
-; 0000 00A8  PORTD=0xff;
+; 0000 00AA  PORTD=0xff;
 	LDI  R30,LOW(255)
 	OUT  0x12,R30
-; 0000 00A9 
-; 0000 00AA  while(1){
+; 0000 00AB 
+; 0000 00AC  while(1){
 _0x5:
-; 0000 00AB     int i = 0;
-; 0000 00AC     for( i =0; i<6; i++){
-	SBIW R28,2
+; 0000 00AD    /* int i = 0;
+; 0000 00AE     for( i =0; i<6; i++){
+; 0000 00AF 
+; 0000 00B0         PORTB = ~FontLookup[5][i];
+; 0000 00B1         delay();
+; 0000 00B2     }
+; 0000 00B3  }
+; 0000 00B4  */ int i,j ;
+; 0000 00B5  int x = 0 ;
+; 0000 00B6 for( j = 0 ; j < 8 ; j++){
+	SBIW R28,6
 	LDI  R30,LOW(0)
 	ST   Y,R30
 	STD  Y+1,R30
-;	i -> Y+0
+;	i -> Y+4
+;	j -> Y+2
+;	x -> Y+0
+	STD  Y+2,R30
+	STD  Y+2+1,R30
+_0x9:
+	LDD  R26,Y+2
+	LDD  R27,Y+2+1
+	SBIW R26,8
+	BRGE _0xA
+; 0000 00B7     x= 0 ;
+	LDI  R30,LOW(0)
 	STD  Y+0,R30
 	STD  Y+0+1,R30
-_0x9:
-	LD   R26,Y
-	LDD  R27,Y+1
-	SBIW R26,6
-	BRGE _0xA
-; 0000 00AD 
-; 0000 00AE         PORTB = ~FontLookup[5][i];
+; 0000 00B8    for(i = j ; i<5+j ; i++){
+	LDD  R30,Y+2
+	LDD  R31,Y+2+1
+	STD  Y+4,R30
+	STD  Y+4+1,R31
+_0xC:
+	LDD  R30,Y+2
+	LDD  R31,Y+2+1
+	ADIW R30,5
+	LDD  R26,Y+4
+	LDD  R27,Y+4+1
+	CP   R26,R30
+	CPC  R27,R31
+	BRGE _0xD
+; 0000 00B9 
+; 0000 00BA     PORTB=whichBlock[i%8];
+	LDD  R30,Y+4
+	LDD  R31,Y+4+1
+	LDI  R26,LOW(7)
+	LDI  R27,HIGH(7)
+	CALL __MANDW12
+	SUBI R30,LOW(-_whichBlock*2)
+	SBCI R31,HIGH(-_whichBlock*2)
+	LPM  R0,Z
+	OUT  0x18,R0
+; 0000 00BB     PORTD=~FontLookup[5][x];
 	__POINTW1FN _FontLookup,30
 	LD   R26,Y
 	LDD  R27,Y+1
@@ -1511,129 +1553,157 @@ _0x9:
 	ADC  R31,R27
 	LPM  R30,Z
 	COM  R30
-	OUT  0x18,R30
-; 0000 00AF         delay();
+	OUT  0x12,R30
+; 0000 00BC     delay();
 	RCALL _delay
-; 0000 00B0     }
+; 0000 00BD     x++;
 	LD   R30,Y
 	LDD  R31,Y+1
 	ADIW R30,1
 	ST   Y,R30
 	STD  Y+1,R31
+; 0000 00BE     }
+	LDD  R30,Y+4
+	LDD  R31,Y+4+1
+	ADIW R30,1
+	STD  Y+4,R30
+	STD  Y+4+1,R31
+	RJMP _0xC
+_0xD:
+; 0000 00BF     DelayLong();
+	RCALL _DelayLong
+; 0000 00C0    }
+	LDD  R30,Y+2
+	LDD  R31,Y+2+1
+	ADIW R30,1
+	STD  Y+2,R30
+	STD  Y+2+1,R31
 	RJMP _0x9
 _0xA:
-; 0000 00B1  }
-	ADIW R28,2
+; 0000 00C1 }
+	ADIW R28,6
 	RJMP _0x5
-; 0000 00B2 
-; 0000 00B3 }
-_0xB:
-	RJMP _0xB
+; 0000 00C2 
+; 0000 00C3  }
+_0xE:
+	RJMP _0xE
 ; .FEND
 ;
-;
+;void DelayLong()
+; 0000 00C6 {
+_DelayLong:
+; .FSTART _DelayLong
+; 0000 00C7  int t;
+; 0000 00C8   for(t=0;t<10000;t++){}
+	ST   -Y,R17
+	ST   -Y,R16
+;	t -> R16,R17
+	__GETWRN 16,17,0
+_0x10:
+	__CPWRN 16,17,10000
+	BRGE _0x11
+	__ADDWRN 16,17,1
+	RJMP _0x10
+_0x11:
+; 0000 00C9 }
+	RJMP _0x2040001
+; .FEND
 ;void delay()
-; 0000 00B7 {
+; 0000 00CB {
 _delay:
 ; .FSTART _delay
-; 0000 00B8  int k;
-; 0000 00B9  for(k=1;k<16000;k++)
+; 0000 00CC  int k;
+; 0000 00CD  for(k=1;k<160;k++)
 	ST   -Y,R17
 	ST   -Y,R16
 ;	k -> R16,R17
 	__GETWRN 16,17,1
-_0xD:
-	__CPWRN 16,17,16000
-	BRGE _0xE
-; 0000 00BA  {
-; 0000 00BB  }
+_0x13:
+	__CPWRN 16,17,160
+	BRGE _0x14
+; 0000 00CE  {
+; 0000 00CF  }
 	__ADDWRN 16,17,1
-	RJMP _0xD
-_0xE:
-; 0000 00BC }
+	RJMP _0x13
+_0x14:
+; 0000 00D0 }
+_0x2040001:
 	LD   R16,Y+
 	LD   R17,Y+
 	RET
 ; .FEND
 ;
 ;void SIGNAL()
-; 0000 00BF {
-; 0000 00C0  cc=cc++;
-; 0000 00C1  Scanner();
-; 0000 00C2  TCNT0=0xFE;
-; 0000 00C3 }
+; 0000 00D3 {
+; 0000 00D4  cc=cc++;
+; 0000 00D5  Scanner();
+; 0000 00D6  TCNT0=0xFE;
+; 0000 00D7 }
 ;
 ;void Scanner()
-; 0000 00C6 {
-; 0000 00C7 switch(cc)
-; 0000 00C8 {
-; 0000 00C9 case 1:
-; 0000 00CA   PORTD=0xFF;
-; 0000 00CB   PORTB=0x80;
-; 0000 00CC   PORTD=~Vline[0];
-; 0000 00CD   break;
-; 0000 00CE case 2:
-; 0000 00CF   PORTD=0xFF;
-; 0000 00D0   PORTB=0x40;
-; 0000 00D1   PORTD=~Vline[1];
-; 0000 00D2   break;
-; 0000 00D3 case 3:
-; 0000 00D4   PORTD=0xFF;
-; 0000 00D5   PORTB=0x20;
-; 0000 00D6   PORTD=~Vline[2];
-; 0000 00D7   break;
-; 0000 00D8 case 4:
-; 0000 00D9   PORTD=0xFF;
-; 0000 00DA   PORTB=0x10;
-; 0000 00DB   PORTD=~Vline[3];
-; 0000 00DC   break;
-; 0000 00DD case 5:
+; 0000 00DA {
+; 0000 00DB switch(cc)
+; 0000 00DC {
+; 0000 00DD case 1:
 ; 0000 00DE   PORTD=0xFF;
-; 0000 00DF   PORTB=0x08;
-; 0000 00E0   PORTD=~Vline[4];
+; 0000 00DF   PORTB=0x80;
+; 0000 00E0   PORTD=~Vline[0];
 ; 0000 00E1   break;
-; 0000 00E2 case 6:
+; 0000 00E2 case 2:
 ; 0000 00E3   PORTD=0xFF;
-; 0000 00E4   PORTB=0x04;
-; 0000 00E5   PORTD=~Vline[5];
+; 0000 00E4   PORTB=0x40;
+; 0000 00E5   PORTD=~Vline[1];
 ; 0000 00E6   break;
-; 0000 00E7 case 7:
+; 0000 00E7 case 3:
 ; 0000 00E8   PORTD=0xFF;
-; 0000 00E9   PORTB=0x02;
-; 0000 00EA   PORTD=~Vline[6];
+; 0000 00E9   PORTB=0x20;
+; 0000 00EA   PORTD=~Vline[2];
 ; 0000 00EB   break;
-; 0000 00EC case 8:
+; 0000 00EC case 4:
 ; 0000 00ED   PORTD=0xFF;
-; 0000 00EE   PORTB=0x01;
-; 0000 00EF   PORTD=~Vline[7];
-; 0000 00F0   cc=0;
-; 0000 00F1 }
-; 0000 00F2 }
+; 0000 00EE   PORTB=0x10;
+; 0000 00EF   PORTD=~Vline[3];
+; 0000 00F0   break;
+; 0000 00F1 case 5:
+; 0000 00F2   PORTD=0xFF;
+; 0000 00F3   PORTB=0x08;
+; 0000 00F4   PORTD=~Vline[4];
+; 0000 00F5   break;
+; 0000 00F6 case 6:
+; 0000 00F7   PORTD=0xFF;
+; 0000 00F8   PORTB=0x04;
+; 0000 00F9   PORTD=~Vline[5];
+; 0000 00FA   break;
+; 0000 00FB case 7:
+; 0000 00FC   PORTD=0xFF;
+; 0000 00FD   PORTB=0x02;
+; 0000 00FE   PORTD=~Vline[6];
+; 0000 00FF   break;
+; 0000 0100 case 8:
+; 0000 0101   PORTD=0xFF;
+; 0000 0102   PORTB=0x01;
+; 0000 0103   PORTD=~Vline[7];
+; 0000 0104   cc=0;
+; 0000 0105 }
+; 0000 0106 }
 ;
 ;/*********************************************************************************/
 ;/*         Display Char                           */
 ;/*********************************************************************************/
 ;void DisplayChar(char f)
-; 0000 00F8 {
-; 0000 00F9 char g;
-; 0000 00FA f=f-0x20;
+; 0000 010C {
+; 0000 010D char g;
+; 0000 010E f=f-0x20;
 ;	f -> Y+1
 ;	g -> R17
-; 0000 00FB  for(g=4;g>=0;g--)
-; 0000 00FC  {
-; 0000 00FD   Vline[y]=pgm_read_byte(&FontLookup[f][g]);
-; 0000 00FE   y=y++;
-; 0000 00FF  }
-; 0000 0100   Vline[y]=0x00;
-; 0000 0101   y=0;//y++;
-; 0000 0102 }
-;
-;void Delay()
-; 0000 0105 {
-; 0000 0106  int t;
-; 0000 0107   for(t=0;t<4000;t++);
-;	t -> R16,R17
-; 0000 0108 }
+; 0000 010F  for(g=4;g>=0;g--)
+; 0000 0110  {
+; 0000 0111   Vline[y]=pgm_read_byte(&FontLookup[f][g]);
+; 0000 0112   y=y++;
+; 0000 0113  }
+; 0000 0114   Vline[y]=0x00;
+; 0000 0115   y=0;//y++;
+; 0000 0116 }
 	#ifndef __SLEEP_DEFINED__
 	#define __SLEEP_DEFINED__
 	.EQU __se_bit=0x40
@@ -1667,5 +1737,25 @@ __lcd_maxx:
 	.CSEG
 
 	.CSEG
+__ANEGW1:
+	NEG  R31
+	NEG  R30
+	SBCI R31,0
+	RET
+
+__MANDW12:
+	CLT
+	SBRS R31,7
+	RJMP __MANDW121
+	RCALL __ANEGW1
+	SET
+__MANDW121:
+	AND  R30,R26
+	AND  R31,R27
+	BRTC __MANDW122
+	RCALL __ANEGW1
+__MANDW122:
+	RET
+
 ;END OF CODE MARKER
 __END_OF_CODE:

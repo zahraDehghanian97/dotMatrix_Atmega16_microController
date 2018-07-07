@@ -25,5 +25,6 @@ vl                                                                              
 FLASH Allocation [words]
 Function                                                                          Address   Size
 ------------------------------------------------------------------------------------------------
-main                                                                              0x00164     46
-delay                                                                             0x00192     14
+main                                                                              0x00168     83
+DelayLong                                                                         0x001BB     12
+delay                                                                             0x001C7     14
